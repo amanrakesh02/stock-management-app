@@ -1,8 +1,16 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import Layout from './components/Layout'
+import ProductsPage from './pages/ProductsPage'
+
 function App() {
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
-      <h1 className="text-3xl font-bold">Tailwind is working</h1>
-    </div>
+    <BrowserRouter>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<ProductsPage />} />
+        </Routes>
+      </Layout>
+    </BrowserRouter>
   )
 }
 
