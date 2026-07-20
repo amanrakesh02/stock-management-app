@@ -23,8 +23,8 @@ export default function BarcodeScanner({ onScan, onError }: Props) {
         (decodedText) => {
           onScan(decodedText)
         },
-        () => {
-          // fires continuously while no code is found — ignore
+        (errorMessage) => {
+          console.log('scan attempt:' , errorMessage)
         }
       )
       .then(() => {
