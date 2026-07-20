@@ -15,13 +15,34 @@ export default function ScanPage() {
   const [product, setProduct] = useState<Product | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  async function lookupProduct(code: string) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, name, barcode, custom_code, reorder_quantity, supplier_id')
+      .or(`barcode.eq.${code},custom_code.eq.${code}`)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (error) {
+      setError(`Lookup failed: ${error.message}`)
+      return
+    }
+    if (!data) {
+      setError('No matching product found. Try manual search.')
+      setProduct(null)
+      return
+    }
+    setProduct(data)
+    setError(null)
+  }
+
   return (
     <div className="p-4">
       <h1 className="text-xl font-semibold mb-4">Scan Product</h1>
-      {<BarcodeScanner 
-          onScan={(code) => console.log('scanned:', code)}
-          onError={(msg) => setError(msg)}
-      />}
+      <BarcodeScanner
+        onScan={(code) => lookupProduct(code)}
+        onError={(msg) => setError(msg)}
+      />
       {error && <p className="text-red-600">{error}</p>}
       {product && <p>Found: {product.name}</p>}
     </div>
