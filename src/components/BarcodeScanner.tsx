@@ -8,31 +8,43 @@ type Props = {
 
 export default function BarcodeScanner({ onScan, onError }: Props) {
   const scannerRef = useRef<Html5Qrcode | null>(null)
+  const isRunningRef = useRef(false)
   const elementId = 'barcode-scanner-region'
 
   useEffect(() => {
     const scanner = new Html5Qrcode(elementId)
     scannerRef.current = scanner
+    let cancelled = false
 
     scanner
       .start(
-        { facingMode: 'environment' }, // back camera
+        { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 250, height: 150 } },
         (decodedText) => {
           onScan(decodedText)
         },
         () => {
-          // fires continuously while no code is found — ignore, not a real error
+          // fires continuously while no code is found — ignore
         }
       )
+      .then(() => {
+        if (cancelled) {
+          // cleanup already ran before start finished — stop immediately
+          scanner.stop().catch(() => {})
+        } else {
+          isRunningRef.current = true
+        }
+      })
       .catch((err) => {
         onError?.(`Camera start failed: ${err}`)
       })
 
     return () => {
-      scanner.stop().catch(() => {
-        // already stopped or never started — safe to ignore
-      })
+      cancelled = true
+      if (isRunningRef.current) {
+        scanner.stop().catch(() => {})
+        isRunningRef.current = false
+      }
     }
   }, [])
 

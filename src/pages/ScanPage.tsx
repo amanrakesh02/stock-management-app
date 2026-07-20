@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import BarcodeScanner from '../components/BarcodeScanner'
 
 type Product = {
   id: string
@@ -17,7 +18,10 @@ export default function ScanPage() {
   return (
     <div className="p-4">
       <h1 className="text-xl font-semibold mb-4">Scan Product</h1>
-      {/* scanner component goes here in Step 3 */}
+      {<BarcodeScanner 
+          onScan={(code) => console.log('scanned:', code)}
+          onError={(msg) => setError(msg)}
+      />}
       {error && <p className="text-red-600">{error}</p>}
       {product && <p>Found: {product.name}</p>}
     </div>
