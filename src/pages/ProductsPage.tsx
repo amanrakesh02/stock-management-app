@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import BarcodeScanner from '../components/BarcodeScanner' 
 
 interface Product {
   id: string
@@ -19,6 +20,7 @@ export default function ProductsPage() {
   const [barcode, setBarcode] = useState('')
   const [reorderQty, setReorderQty] = useState('0')
   const [editing, setEditing] = useState<Product | null>(null)
+  const [scanningFor, setScanningFor] = useState<'add' | 'edit' | null>(null)
 
   const load = () => {
     supabase
@@ -83,7 +85,10 @@ export default function ProductsPage() {
 
       <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Product name" className="rounded border border-slate-300 px-2 py-1 text-sm" />
-        <input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Barcode (optional)" className="rounded border border-slate-300 px-2 py-1 text-sm" />
+        <div className="flex gap-2">
+          <input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Barcode (optional)" className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm" />
+          <button type="button" onClick={() => setScanningFor('add')} className="rounded bg-slate-700 px-3 text-sm text-white">Scan</button>
+        </div>
         <input type="number" value={reorderQty} onChange={(e) => setReorderQty(e.target.value)} placeholder="Reorder quantity" className="rounded border border-slate-300 px-2 py-1 text-sm" />
         <button onClick={addProduct} className="rounded bg-slate-900 py-1.5 text-sm text-white">Add product</button>
       </div>
@@ -104,7 +109,10 @@ export default function ProductsPage() {
         <div className="fixed inset-0 flex items-center justify-center bg-black/40">
           <div className="flex w-72 flex-col gap-2 rounded-lg bg-white p-4">
             <input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="rounded border border-slate-300 px-2 py-1 text-sm" />
-            <input value={editing.barcode ?? ''} onChange={(e) => setEditing({ ...editing, barcode: e.target.value })} className="rounded border border-slate-300 px-2 py-1 text-sm" />
+            <div className="flex gap-2">
+              <input value={editing.barcode ?? ''} onChange={(e) => setEditing({ ...editing, barcode: e.target.value })} className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm" />
+              <button type="button" onClick={() => setScanningFor('edit')} className="rounded bg-slate-700 px-3 text-sm text-white">Scan</button>
+            </div>
             <input type="number" value={editing.reorder_quantity} onChange={(e) => setEditing({ ...editing, reorder_quantity: Number(e.target.value) })} className="rounded border border-slate-300 px-2 py-1 text-sm" />
             <button onClick={saveEdit} className="rounded bg-slate-900 py-1.5 text-sm text-white">Save</button>
             <button onClick={discontinue} className="rounded border border-red-300 py-1.5 text-sm text-red-600">Mark discontinued</button>
@@ -112,6 +120,28 @@ export default function ProductsPage() {
           </div>
         </div>
       )}
+      {scanningFor && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40">
+          <div className="flex w-72 flex-col gap-2 rounded-lg bg-white p-4">
+            <p className="text-sm font-medium">Scan barcode</p>
+              <BarcodeScanner
+                onScan={(code) => {
+                  if (scanningFor === 'add') {
+                    setBarcode(code)
+                    } else if (scanningFor === 'edit' && editing) {
+                      setEditing({ ...editing, barcode: code })
+                    }
+                    setScanningFor(null)
+                }}
+                onError={(msg) => {
+                  alert(msg)
+                  setScanningFor(null)
+                }}
+              />
+            <button onClick={() => setScanningFor(null)} className="text-sm text-slate-500">Cancel</button>
+          </div>
+        </div>
+          )}
     </div>
   )
 }
