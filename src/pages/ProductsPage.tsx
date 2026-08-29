@@ -1,6 +1,17 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import BarcodeScanner from '../components/BarcodeScanner' 
+import BarcodeScanner from '../components/BarcodeScanner'
+
+const inputClass =
+  'rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors'
+const primaryButtonClass =
+  'rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700 transition-colors'
+const secondaryButtonClass =
+  'rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors'
+const ghostButtonClass = 'text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors'
+const dangerButtonClass =
+  'rounded-lg border border-red-200 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors'
+const cardClass = 'flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
 
 interface Product {
   id: string
@@ -77,71 +88,72 @@ export default function ProductsPage() {
     load()
   }
 
-  if (loading) return <p>Loading...</p>
+  if (loading) return <p className="py-8 text-center text-sm text-slate-500">Loading...</p>
 
   return (
-    <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-semibold">Products</h2>
+    <div className="flex flex-col gap-6">
+      <h2 className="text-xl font-semibold tracking-tight text-slate-900">Products</h2>
 
-      <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Product name" className="rounded border border-slate-300 px-2 py-1 text-sm" />
+      <div className={cardClass}>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Product name" className={inputClass} />
         <div className="flex gap-2">
-          <input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Barcode (optional)" className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm" />
-          <button type="button" onClick={() => setScanningFor('add')} className="rounded bg-slate-700 px-3 text-sm text-white">Scan</button>
+          <input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Barcode (optional)" className={`flex-1 ${inputClass}`} />
+          <button type="button" onClick={() => setScanningFor('add')} className={secondaryButtonClass}>Scan</button>
         </div>
-        <input type="number" value={reorderQty} onChange={(e) => setReorderQty(e.target.value)} placeholder="Reorder quantity" className="rounded border border-slate-300 px-2 py-1 text-sm" />
-        <button onClick={addProduct} className="rounded bg-slate-900 py-1.5 text-sm text-white">Add product</button>
+        <input type="number" value={reorderQty} onChange={(e) => setReorderQty(e.target.value)} placeholder="Reorder quantity" className={inputClass} />
+        <button onClick={addProduct} className={primaryButtonClass}>Add product</button>
       </div>
 
-      <ul className="flex flex-col divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+      <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         {products.map((p) => (
-          <li key={p.id} onClick={() => setEditing(p)} className="flex cursor-pointer justify-between px-3 py-2">
+          <li key={p.id} onClick={() => setEditing(p)} className="flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-slate-50">
             <div>
-              <p className="font-medium">{p.name}</p>
+              <p className="font-medium text-slate-900">{p.name}</p>
               <p className="text-xs text-slate-500">{p.barcode || p.custom_code} · {p.supplier_name ?? 'no supplier'}</p>
             </div>
-            <span className="text-sm">{p.total_stock} on hand</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{p.total_stock} on hand</span>
           </li>
         ))}
       </ul>
 
       {editing && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40">
-          <div className="flex w-72 flex-col gap-2 rounded-lg bg-white p-4">
-            <input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="rounded border border-slate-300 px-2 py-1 text-sm" />
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="flex w-full max-w-xs flex-col gap-2 rounded-xl bg-white p-5 shadow-xl">
+            <p className="text-sm font-semibold text-slate-900">Edit product</p>
+            <input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className={inputClass} />
             <div className="flex gap-2">
-              <input value={editing.barcode ?? ''} onChange={(e) => setEditing({ ...editing, barcode: e.target.value })} className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm" />
-              <button type="button" onClick={() => setScanningFor('edit')} className="rounded bg-slate-700 px-3 text-sm text-white">Scan</button>
+              <input value={editing.barcode ?? ''} onChange={(e) => setEditing({ ...editing, barcode: e.target.value })} className={`flex-1 ${inputClass}`} />
+              <button type="button" onClick={() => setScanningFor('edit')} className={secondaryButtonClass}>Scan</button>
             </div>
-            <input type="number" value={editing.reorder_quantity} onChange={(e) => setEditing({ ...editing, reorder_quantity: Number(e.target.value) })} className="rounded border border-slate-300 px-2 py-1 text-sm" />
-            <button onClick={saveEdit} className="rounded bg-slate-900 py-1.5 text-sm text-white">Save</button>
-            <button onClick={discontinue} className="rounded border border-red-300 py-1.5 text-sm text-red-600">Mark discontinued</button>
-            <button onClick={() => setEditing(null)} className="text-sm text-slate-500">Cancel</button>
+            <input type="number" value={editing.reorder_quantity} onChange={(e) => setEditing({ ...editing, reorder_quantity: Number(e.target.value) })} className={inputClass} />
+            <button onClick={saveEdit} className={primaryButtonClass}>Save</button>
+            <button onClick={discontinue} className={dangerButtonClass}>Mark discontinued</button>
+            <button onClick={() => setEditing(null)} className={`self-center ${ghostButtonClass}`}>Cancel</button>
           </div>
         </div>
       )}
       {scanningFor && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40">
-          <div className="flex w-72 flex-col gap-2 rounded-lg bg-white p-4">
-            <p className="text-sm font-medium">Scan barcode</p>
-              <BarcodeScanner
-                onScan={(code) => {
-                  if (scanningFor === 'add') {
-                    setBarcode(code)
-                    } else if (scanningFor === 'edit' && editing) {
-                      setEditing({ ...editing, barcode: code })
-                    }
-                    setScanningFor(null)
-                }}
-                onError={(msg) => {
-                  alert(msg)
-                  setScanningFor(null)
-                }}
-              />
-            <button onClick={() => setScanningFor(null)} className="text-sm text-slate-500">Cancel</button>
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="flex w-full max-w-xs flex-col gap-3 rounded-xl bg-white p-5 shadow-xl">
+            <p className="text-sm font-semibold text-slate-900">Scan barcode</p>
+            <BarcodeScanner
+              onScan={(code) => {
+                if (scanningFor === 'add') {
+                  setBarcode(code)
+                } else if (scanningFor === 'edit' && editing) {
+                  setEditing({ ...editing, barcode: code })
+                }
+                setScanningFor(null)
+              }}
+              onError={(msg) => {
+                alert(msg)
+                setScanningFor(null)
+              }}
+            />
+            <button onClick={() => setScanningFor(null)} className={`self-center ${ghostButtonClass}`}>Cancel</button>
           </div>
         </div>
-          )}
+      )}
     </div>
   )
 }

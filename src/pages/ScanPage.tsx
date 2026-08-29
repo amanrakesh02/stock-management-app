@@ -2,6 +2,15 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import BarcodeScanner from '../components/BarcodeScanner'
 
+const inputClass =
+  'rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors'
+const primaryButtonClass =
+  'rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700 transition-colors'
+const secondaryButtonClass =
+  'rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors'
+const ghostButtonClass = 'text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors'
+const cardClass = 'flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
+
 interface Product {
   id: string
   name: string
@@ -121,26 +130,24 @@ export default function ScanPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-semibold">Scan Product</h2>
+    <div className="flex flex-col gap-6">
+      <h2 className="text-xl font-semibold tracking-tight text-slate-900">Scan Product</h2>
 
       {scanning && !product && (
-        <div className="flex flex-col gap-2">
-          <BarcodeScanner
-            onScan={(code) => {
-              setScanning(false)
-              lookupByCode(code)
-            }}
-            onError={(msg) => {
-              setError(msg)
-              setScanning(false)
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => setScanning(false)}
-            className="text-sm text-slate-500"
-          >
+        <div className="flex flex-col gap-3">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <BarcodeScanner
+              onScan={(code) => {
+                setScanning(false)
+                lookupByCode(code)
+              }}
+              onError={(msg) => {
+                setError(msg)
+                setScanning(false)
+              }}
+            />
+          </div>
+          <button type="button" onClick={() => setScanning(false)} className={`self-center ${ghostButtonClass}`}>
             Enter manually instead
           </button>
         </div>
@@ -149,20 +156,16 @@ export default function ScanPage() {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {!scanning && !product && (
-        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3">
+        <div className={cardClass}>
           <div className="flex gap-2">
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && runSearch()}
               placeholder="Search by name, barcode, or code"
-              className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm"
+              className={`flex-1 ${inputClass}`}
             />
-            <button
-              type="button"
-              onClick={runSearch}
-              className="rounded bg-slate-900 px-3 text-sm text-white"
-            >
+            <button type="button" onClick={runSearch} className={primaryButtonClass + ' px-3'}>
               Search
             </button>
           </div>
@@ -173,7 +176,7 @@ export default function ScanPage() {
               setSearchResults([])
               setScanning(true)
             }}
-            className="text-sm text-slate-500"
+            className={`self-center ${ghostButtonClass}`}
           >
             Back to camera
           </button>
@@ -181,20 +184,22 @@ export default function ScanPage() {
           {searching && <p className="text-sm text-slate-500">Searching...</p>}
 
           {searchResults.length > 0 && (
-            <ul className="flex flex-col divide-y divide-slate-200 rounded-lg border border-slate-200">
+            <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
               {searchResults.map((p) => (
                 <li
                   key={p.id}
                   onClick={() => selectProduct(p)}
-                  className="flex cursor-pointer justify-between px-3 py-2"
+                  className="flex cursor-pointer items-center justify-between px-3 py-2 transition-colors hover:bg-slate-50"
                 >
                   <div>
-                    <p className="font-medium">{p.name}</p>
+                    <p className="font-medium text-slate-900">{p.name}</p>
                     <p className="text-xs text-slate-500">
                       {p.barcode || p.custom_code} · {p.supplier_name ?? 'no supplier'}
                     </p>
                   </div>
-                  <span className="text-sm">{p.total_stock} on hand</span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                    {p.total_stock} on hand
+                  </span>
                 </li>
               ))}
             </ul>
@@ -203,20 +208,22 @@ export default function ScanPage() {
       )}
 
       {product && (
-        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3">
-          <p className="font-medium">{product.name}</p>
-          <p className="text-xs text-slate-500">
-            {product.barcode || product.custom_code} · {product.supplier_name ?? 'no supplier'} ·{' '}
-            {product.total_stock} on hand
-          </p>
+        <div className={cardClass}>
+          <div>
+            <p className="font-medium text-slate-900">{product.name}</p>
+            <p className="text-xs text-slate-500">
+              {product.barcode || product.custom_code} · {product.supplier_name ?? 'no supplier'} ·{' '}
+              {product.total_stock} on hand
+            </p>
+          </div>
           <input
             type="number"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             placeholder="Quantity"
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
+            className={inputClass}
           />
-          <button onClick={addToList} className="rounded bg-slate-900 py-1.5 text-sm text-white">
+          <button onClick={addToList} className={primaryButtonClass}>
             Add to list
           </button>
           <button
@@ -225,7 +232,7 @@ export default function ScanPage() {
               setProduct(null)
               setScanning(true)
             }}
-            className="text-sm text-slate-500"
+            className={`self-center ${ghostButtonClass}`}
           >
             Cancel
           </button>
@@ -233,26 +240,26 @@ export default function ScanPage() {
       )}
 
       {list.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold text-slate-700">Restock list</h3>
-          <ul className="flex flex-col divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+          <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             {list.map((item) => (
-              <li key={item.product.id} className="flex items-center justify-between px-3 py-2">
+              <li key={item.product.id} className="flex items-center justify-between px-4 py-3">
                 <div>
-                  <p className="font-medium">{item.product.name}</p>
+                  <p className="font-medium text-slate-900">{item.product.name}</p>
                   <p className="text-xs text-slate-500">Qty: {item.quantity}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => removeFromList(item.product.id)}
-                  className="text-sm text-red-600"
+                  className="text-sm font-medium text-red-600 hover:text-red-700"
                 >
                   Remove
                 </button>
               </li>
             ))}
           </ul>
-          <button onClick={shareList} className="rounded bg-slate-700 py-1.5 text-sm text-white">
+          <button onClick={shareList} className={secondaryButtonClass + ' py-2'}>
             Share list
           </button>
         </div>
