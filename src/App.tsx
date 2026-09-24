@@ -3,6 +3,7 @@ import Layout from './components/Layout'
 import ProductsPage from './pages/ProductsPage'
 import ScanPage from './pages/ScanPage'
 import DeliveryPage from './pages/DeliveryPage'
+import SuppliersPage from './pages/SuppliersPage'
 
 function App() {
   return (
@@ -10,8 +11,9 @@ function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<ProductsPage />} />
-	        <Route path="/scan" element={<ScanPage />} />
+          <Route path="/scan" element={<ScanPage />} />
           <Route path="/delivery" element={<DeliveryPage />} />
+          <Route path="/suppliers" element={<SuppliersPage />} />
         </Routes>
       </Layout>
     </BrowserRouter>

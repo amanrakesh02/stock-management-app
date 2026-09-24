@@ -5,6 +5,7 @@ const tabs = [
   { to: '/', label: 'Products', end: true },
   { to: '/scan', label: 'Restock', end: false },
   { to: '/delivery', label: 'Delivery', end: false },
+  { to: '/suppliers', label: 'Suppliers', end: false },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -14,14 +15,14 @@ export default function Layout({ children }: { children: ReactNode }) {
         <header className="px-4 pt-4 pb-2">
           <h1 className="text-lg font-semibold tracking-tight text-white">Restock</h1>
         </header>
-        <nav className="flex gap-1 px-3 pb-3">
+        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 [scrollbar-width:none]">
           {tabs.map((tab) => (
             <NavLink
               key={tab.to}
               to={tab.to}
               end={tab.end}
               className={({ isActive }) =>
-                `rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                `shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   isActive ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
                 }`
               }
