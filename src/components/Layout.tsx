@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 
 const tabs = [
-  { to: '/', label: 'Products', end: true },
+  // Products lives at / but its detail pages are under /products/:id
+  { to: '/', label: 'Products', end: true, alsoActive: '/products/' },
   { to: '/scan', label: 'Restock', end: false },
   { to: '/delivery', label: 'Delivery', end: false },
   { to: '/expiry', label: 'Expiry', end: false },
@@ -10,6 +11,7 @@ const tabs = [
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="sticky top-0 z-10 bg-slate-900 shadow-sm">
@@ -22,11 +24,12 @@ export default function Layout({ children }: { children: ReactNode }) {
               key={tab.to}
               to={tab.to}
               end={tab.end}
-              className={({ isActive }) =>
-                `shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  isActive ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              className={({ isActive }) => {
+                const active = isActive || (!!tab.alsoActive && pathname.startsWith(tab.alsoActive))
+                return `shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                  active ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
                 }`
-              }
+              }}
             >
               {tab.label}
             </NavLink>
