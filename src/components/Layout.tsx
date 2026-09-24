@@ -5,6 +5,7 @@ const tabs = [
   { to: '/', label: 'Products', end: true },
   { to: '/scan', label: 'Restock', end: false },
   { to: '/delivery', label: 'Delivery', end: false },
+  { to: '/expiry', label: 'Expiry', end: false },
   { to: '/suppliers', label: 'Suppliers', end: false },
 ]
 
