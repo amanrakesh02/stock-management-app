@@ -145,7 +145,7 @@ export default function ProductsPage() {
           <input
             value={customCode}
             onChange={(e) => setCustomCode(e.target.value)}
-            placeholder="Custom code (optional, for items without a barcode)"
+            placeholder="Custom code (optional)"
             className={inputClass}
           />
           <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={inputClass}>

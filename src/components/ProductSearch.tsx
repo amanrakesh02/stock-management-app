@@ -91,7 +91,7 @@ export default function ProductSearch({ onSelect, inlineCamera = false }: Props)
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && runSearch()}
-          placeholder="Search by name, barcode, or code"
+          placeholder="Name, barcode or code"
           className={`min-w-0 flex-1 ${inputClass}`}
         />
         <button type="button" onClick={runSearch} className={`${primaryButtonClass} px-3`}>
