@@ -1,131 +1,34 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-
-const inputClass =
-  'rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors'
-const primaryButtonClass =
-  'rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50'
-const secondaryButtonClass =
-  'rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors'
-const cardClass = 'flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
-const labelClass = 'text-xs font-medium text-slate-500'
-
-interface Supplier {
-  id: string
-  name: string
-}
-
-interface ProductOption {
-  id: string
-  name: string
-  barcode: string | null
-  custom_code: string | null
-}
+import ProductSearch from '../components/ProductSearch'
+import { isoDate, productCode } from '../lib/format'
+import type { Product, Supplier } from '../lib/types'
+import {
+  cardClass,
+  errorClass,
+  inputClass,
+  labelClass,
+  pageTitleClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+  successClass,
+} from '../lib/ui'
 
 interface LineItem {
   key: string
-  product: ProductOption | null
+  product: Product | null
   quantity: string
   expiryDate: string
-}
-
-function today() {
-  return new Date().toISOString().slice(0, 10)
 }
 
 function emptyLineItem(): LineItem {
   return { key: crypto.randomUUID(), product: null, quantity: '', expiryDate: '' }
 }
 
-function ProductPicker({
-  value,
-  onChange,
-}: {
-  value: ProductOption | null
-  onChange: (product: ProductOption) => void
-}) {
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<ProductOption[]>([])
-  const [searching, setSearching] = useState(false)
-
-  const runSearch = async () => {
-    const q = query.trim()
-    if (!q) return
-    setSearching(true)
-    const { data, error } = await supabase
-      .from('product_details')
-      .select('id, name, barcode, custom_code')
-      .or(`name.ilike.%${q}%,barcode.ilike.%${q}%,custom_code.ilike.%${q}%`)
-      .eq('status', 'active')
-      .order('name')
-    setSearching(false)
-    if (error) {
-      console.error(error)
-      return
-    }
-    setResults(data as ProductOption[])
-  }
-
-  if (value) {
-    return (
-      <div className="flex items-center justify-between rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm">
-        <span className="font-medium text-slate-900">{value.name}</span>
-        <button
-          type="button"
-          onClick={() => {
-            onChange(null as unknown as ProductOption)
-            setResults([])
-            setQuery('')
-          }}
-          className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
-        >
-          Change
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex gap-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && runSearch()}
-          placeholder="Search by name, barcode, or code"
-          className={`flex-1 ${inputClass}`}
-        />
-        <button type="button" onClick={runSearch} className={secondaryButtonClass}>
-          Search
-        </button>
-      </div>
-      {searching && <p className="text-xs text-slate-500">Searching...</p>}
-      {results.length > 0 && (
-        <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
-          {results.map((p) => (
-            <li
-              key={p.id}
-              onClick={() => {
-                onChange(p)
-                setResults([])
-                setQuery('')
-              }}
-              className="cursor-pointer px-3 py-2 text-sm transition-colors hover:bg-slate-50"
-            >
-              <span className="font-medium text-slate-900">{p.name}</span>
-              <span className="ml-1 text-xs text-slate-500">{p.barcode || p.custom_code}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
 export default function DeliveryPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [supplierId, setSupplierId] = useState('')
-  const [deliveredAt, setDeliveredAt] = useState(today())
+  const [deliveredAt, setDeliveredAt] = useState(isoDate())
   const [lineItems, setLineItems] = useState<LineItem[]>([emptyLineItem()])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -134,7 +37,7 @@ export default function DeliveryPage() {
   useEffect(() => {
     supabase
       .from('suppliers')
-      .select('id, name')
+      .select('id, name, contact')
       .order('name')
       .then(({ data, error }) => {
         if (error) console.error(error)
@@ -158,7 +61,7 @@ export default function DeliveryPage() {
 
   const resetForm = () => {
     setSupplierId('')
-    setDeliveredAt(today())
+    setDeliveredAt(isoDate())
     setLineItems([emptyLineItem()])
   }
 
@@ -202,14 +105,14 @@ export default function DeliveryPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-xl font-semibold tracking-tight text-slate-900">Record Delivery</h2>
+      <h2 className={pageTitleClass}>Record Delivery</h2>
 
       {success && (
-        <p className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+        <p className={successClass}>
           Delivery recorded.
         </p>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className={errorClass}>{error}</p>}
 
       <div className={cardClass}>
         <label className={labelClass}>Supplier</label>
@@ -251,7 +154,23 @@ export default function DeliveryPage() {
               )}
             </div>
 
-            <ProductPicker value={item.product} onChange={(p) => updateLineItem(item.key, { product: p })} />
+            {item.product ? (
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-900">{item.product.name}</p>
+                  <p className="truncate text-xs text-slate-500">{productCode(item.product)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => updateLineItem(item.key, { product: null })}
+                  className="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <ProductSearch onSelect={(p) => updateLineItem(item.key, { product: p })} />
+            )}
 
             <input
               type="number"
