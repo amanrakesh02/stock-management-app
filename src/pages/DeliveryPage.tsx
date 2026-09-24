@@ -1,119 +1,96 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-
-const inputClass =
-  'rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors'
-const primaryButtonClass =
-  'rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50'
-const secondaryButtonClass =
-  'rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors'
-const cardClass = 'flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
-const labelClass = 'text-xs font-medium text-slate-500'
-
-interface Supplier {
-  id: string
-  name: string
-}
-
-interface ProductOption {
-  id: string
-  name: string
-  barcode: string | null
-  custom_code: string | null
-}
+import ProductSearch from '../components/ProductSearch'
+import { formatDate, isoDate, productCode } from '../lib/format'
+import type { Product, Supplier } from '../lib/types'
+import {
+  cardClass,
+  errorClass,
+  inputClass,
+  labelClass,
+  listClass,
+  pageTitleClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+  successClass,
+} from '../lib/ui'
 
 interface LineItem {
   key: string
-  product: ProductOption | null
+  product: Product | null
   quantity: string
   expiryDate: string
-}
-
-function today() {
-  return new Date().toISOString().slice(0, 10)
 }
 
 function emptyLineItem(): LineItem {
   return { key: crypto.randomUUID(), product: null, quantity: '', expiryDate: '' }
 }
 
-function ProductPicker({
-  value,
-  onChange,
-}: {
-  value: ProductOption | null
-  onChange: (product: ProductOption) => void
-}) {
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<ProductOption[]>([])
-  const [searching, setSearching] = useState(false)
+interface DeliveryRow {
+  id: string
+  delivered_at: string
+  reference: string | null
+  suppliers: { name: string } | null
+  batches: { id: string; quantity: number; expiry_date: string | null; products: { name: string } | null }[]
+}
 
-  const runSearch = async () => {
-    const q = query.trim()
-    if (!q) return
-    setSearching(true)
-    const { data, error } = await supabase
-      .from('product_details')
-      .select('id, name, barcode, custom_code')
-      .or(`name.ilike.%${q}%,barcode.ilike.%${q}%,custom_code.ilike.%${q}%`)
-      .eq('status', 'active')
-      .order('name')
-    setSearching(false)
-    if (error) {
-      console.error(error)
-      return
-    }
-    setResults(data as ProductOption[])
-  }
+function DeliveryHistory() {
+  const [deliveries, setDeliveries] = useState<DeliveryRow[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<string | null>(null)
 
-  if (value) {
-    return (
-      <div className="flex items-center justify-between rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm">
-        <span className="font-medium text-slate-900">{value.name}</span>
-        <button
-          type="button"
-          onClick={() => {
-            onChange(null as unknown as ProductOption)
-            setResults([])
-            setQuery('')
-          }}
-          className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
-        >
-          Change
-        </button>
-      </div>
-    )
-  }
+  useEffect(() => {
+    supabase
+      .from('deliveries')
+      .select('id, delivered_at, reference, suppliers(name), batches(id, quantity, expiry_date, products(name))')
+      .order('delivered_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data, error }) => {
+        if (error) setError(error.message)
+        else setDeliveries(data as unknown as DeliveryRow[])
+      })
+  }, [])
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex gap-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && runSearch()}
-          placeholder="Search by name, barcode, or code"
-          className={`flex-1 ${inputClass}`}
-        />
-        <button type="button" onClick={runSearch} className={secondaryButtonClass}>
-          Search
-        </button>
-      </div>
-      {searching && <p className="text-xs text-slate-500">Searching...</p>}
-      {results.length > 0 && (
-        <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
-          {results.map((p) => (
-            <li
-              key={p.id}
-              onClick={() => {
-                onChange(p)
-                setResults([])
-                setQuery('')
-              }}
-              className="cursor-pointer px-3 py-2 text-sm transition-colors hover:bg-slate-50"
-            >
-              <span className="font-medium text-slate-900">{p.name}</span>
-              <span className="ml-1 text-xs text-slate-500">{p.barcode || p.custom_code}</span>
+    <div className="flex flex-col gap-3">
+      <h3 className="text-sm font-semibold text-slate-700">Recent deliveries</h3>
+      {error && <p className={errorClass}>{error}</p>}
+      {deliveries === null && !error && <p className="text-sm text-slate-500">Loading...</p>}
+      {deliveries?.length === 0 && <p className="text-sm text-slate-500">No deliveries recorded yet.</p>}
+      {deliveries && deliveries.length > 0 && (
+        <ul className={listClass}>
+          {deliveries.map((d) => (
+            <li key={d.id}>
+              <button
+                type="button"
+                onClick={() => setExpanded(expanded === d.id ? null : d.id)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-900">{d.suppliers?.name ?? 'Unknown supplier'}</p>
+                  <p className="truncate text-xs text-slate-500">
+                    {formatDate(d.delivered_at)}
+                    {d.reference ? ` · ${d.reference}` : ''}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs text-slate-500">
+                  {d.batches.length} item{d.batches.length === 1 ? '' : 's'} {expanded === d.id ? '▴' : '▾'}
+                </span>
+              </button>
+              {expanded === d.id && (
+                <ul className="flex flex-col gap-1 bg-slate-50 px-4 py-2">
+                  {d.batches.map((b) => (
+                    <li key={b.id} className="flex justify-between gap-3 text-xs text-slate-600">
+                      <span className="truncate">{b.products?.name ?? 'Unknown product'}</span>
+                      <span className="shrink-0">
+                        {b.quantity > 0 ? `${b.quantity} left` : 'used up'}
+                        {b.expiry_date ? ` · exp ${formatDate(b.expiry_date)}` : ''}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>
@@ -125,16 +102,19 @@ function ProductPicker({
 export default function DeliveryPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [supplierId, setSupplierId] = useState('')
-  const [deliveredAt, setDeliveredAt] = useState(today())
+  const [deliveredAt, setDeliveredAt] = useState(isoDate())
+  const [reference, setReference] = useState('')
   const [lineItems, setLineItems] = useState<LineItem[]>([emptyLineItem()])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  // Bumped after each saved delivery so the history list refetches.
+  const [historyKey, setHistoryKey] = useState(0)
 
   useEffect(() => {
     supabase
       .from('suppliers')
-      .select('id, name')
+      .select('id, name, contact')
       .order('name')
       .then(({ data, error }) => {
         if (error) console.error(error)
@@ -158,7 +138,8 @@ export default function DeliveryPage() {
 
   const resetForm = () => {
     setSupplierId('')
-    setDeliveredAt(today())
+    setDeliveredAt(isoDate())
+    setReference('')
     setLineItems([emptyLineItem()])
   }
 
@@ -176,7 +157,7 @@ export default function DeliveryPage() {
     setSubmitting(true)
     const { data: delivery, error: deliveryError } = await supabase
       .from('deliveries')
-      .insert({ supplier_id: supplierId, delivered_at: deliveredAt })
+      .insert({ supplier_id: supplierId, delivered_at: deliveredAt, reference: reference.trim() || null })
       .select('id')
       .single()
 
@@ -193,23 +174,25 @@ export default function DeliveryPage() {
     }))
 
     const { error: batchError } = await supabase.from('batches').insert(batchRows)
-    setSubmitting(false)
-    if (batchError) return setError(batchError.message)
+    if (batchError) {
+      // don't leave an empty delivery behind if its items failed to save
+      await supabase.from('deliveries').delete().eq('id', delivery.id)
+      setSubmitting(false)
+      return setError(batchError.message)
+    }
 
+    setSubmitting(false)
     setSuccess(true)
+    setHistoryKey((k) => k + 1)
     resetForm()
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-xl font-semibold tracking-tight text-slate-900">Record Delivery</h2>
+      <h2 className={pageTitleClass}>Record Delivery</h2>
 
-      {success && (
-        <p className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
-          Delivery recorded.
-        </p>
-      )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {success && <p className={successClass}>Delivery recorded.</p>}
+      {error && <p className={errorClass}>{error}</p>}
 
       <div className={cardClass}>
         <label className={labelClass}>Supplier</label>
@@ -233,6 +216,14 @@ export default function DeliveryPage() {
           onChange={(e) => setDeliveredAt(e.target.value)}
           className={inputClass}
         />
+
+        <label className={labelClass}>Reference / invoice no. (optional)</label>
+        <input
+          value={reference}
+          onChange={(e) => setReference(e.target.value)}
+          placeholder="e.g. INV-1042"
+          className={inputClass}
+        />
       </div>
 
       <div className="flex flex-col gap-3">
@@ -251,22 +242,46 @@ export default function DeliveryPage() {
               )}
             </div>
 
-            <ProductPicker value={item.product} onChange={(p) => updateLineItem(item.key, { product: p })} />
+            {item.product ? (
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-900">{item.product.name}</p>
+                  <p className="truncate text-xs text-slate-500">{productCode(item.product)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => updateLineItem(item.key, { product: null })}
+                  className="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <ProductSearch onSelect={(p) => updateLineItem(item.key, { product: p })} />
+            )}
 
-            <input
-              type="number"
-              value={item.quantity}
-              onChange={(e) => updateLineItem(item.key, { quantity: e.target.value })}
-              placeholder="Quantity received"
-              className={inputClass}
-            />
-            <input
-              type="date"
-              value={item.expiryDate}
-              onChange={(e) => updateLineItem(item.key, { expiryDate: e.target.value })}
-              placeholder="Expiry date (optional)"
-              className={inputClass}
-            />
+            <div className="flex gap-2">
+              <label className={`flex-1 ${labelClass}`}>
+                Quantity received
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  value={item.quantity}
+                  onChange={(e) => updateLineItem(item.key, { quantity: e.target.value })}
+                  className={`mt-1 w-full ${inputClass}`}
+                />
+              </label>
+              <label className={`flex-1 ${labelClass}`}>
+                Expiry (optional)
+                <input
+                  type="date"
+                  value={item.expiryDate}
+                  onChange={(e) => updateLineItem(item.key, { expiryDate: e.target.value })}
+                  className={`mt-1 w-full ${inputClass}`}
+                />
+              </label>
+            </div>
           </div>
         ))}
       </div>
@@ -282,6 +297,8 @@ export default function DeliveryPage() {
       <button onClick={submit} disabled={submitting} className={primaryButtonClass}>
         {submitting ? 'Saving...' : 'Save delivery'}
       </button>
+
+      <DeliveryHistory key={historyKey} />
     </div>
   )
 }
