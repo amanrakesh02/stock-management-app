@@ -16,6 +16,11 @@ export function productCodeFilter(code: string) {
   return `barcode.eq.${v},custom_code.eq.${v}`
 }
 
+export function friendlyProductError(error: { code?: string; message: string }) {
+  // 23505 = unique violation (barcode / custom code already used)
+  return error.code === '23505' ? 'Another product already uses that barcode or code.' : error.message
+}
+
 export type StockStatus = 'out' | 'low' | 'ok'
 
 // "Low" means below the product's reorder quantity; products with a reorder

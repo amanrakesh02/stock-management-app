@@ -1,90 +1,114 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import BarcodeScanner from '../components/BarcodeScanner'
+import Modal from '../components/Modal'
+import { friendlyProductError, productCode, stockBadgeClass, stockStatus } from '../lib/format'
+import type { Product, Supplier } from '../lib/types'
+import {
+  cardClass,
+  errorClass,
+  inputClass,
+  labelClass,
+  listClass,
+  pageTitleClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from '../lib/ui'
 
-const inputClass =
-  'rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors'
-const primaryButtonClass =
-  'rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700 transition-colors'
-const secondaryButtonClass =
-  'rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors'
-const ghostButtonClass = 'text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors'
-const dangerButtonClass =
-  'rounded-lg border border-red-200 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors'
-const cardClass = 'flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
+type Filter = 'all' | 'low' | 'out' | 'discontinued'
 
-interface Product {
-  id: string
-  name: string
-  barcode: string | null
-  custom_code: string | null
-  supplier_name: string | null
-  total_stock: number
-  reorder_quantity: number
-  status: string
+const filterLabels: Record<Filter, string> = {
+  all: 'Active',
+  low: 'Low',
+  out: 'Out',
+  discontinued: 'Discontinued',
+}
+
+function matchesFilter(p: Product, filter: Filter) {
+  if (filter === 'discontinued') return p.status === 'discontinued'
+  if (p.status !== 'active') return false
+  if (filter === 'low') return stockStatus(p) === 'low'
+  if (filter === 'out') return stockStatus(p) === 'out'
+  return true
 }
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<Filter>('all')
+  const [query, setQuery] = useState('')
+
+  const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [barcode, setBarcode] = useState('')
+  const [customCode, setCustomCode] = useState('')
+  const [supplierId, setSupplierId] = useState('')
   const [reorderQty, setReorderQty] = useState('0')
-  const [editing, setEditing] = useState<Product | null>(null)
-  const [scanningFor, setScanningFor] = useState<'add' | 'edit' | null>(null)
+  const [scanning, setScanning] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const load = () => {
     supabase
       .from('product_details')
       .select('*')
-      .eq('status', 'active')
       .order('name')
       .then(({ data, error }) => {
-        if (error) console.error(error)
+        if (error) setError(error.message)
         else setProducts(data as Product[])
         setLoading(false)
       })
   }
 
-  useEffect(load, [])
+  useEffect(() => {
+    load()
+    supabase
+      .from('suppliers')
+      .select('id, name, contact')
+      .order('name')
+      .then(({ data, error }) => {
+        if (error) console.error(error)
+        else setSuppliers(data as Supplier[])
+      })
+  }, [])
+
+  const counts = useMemo(() => {
+    const c: Record<Filter, number> = { all: 0, low: 0, out: 0, discontinued: 0 }
+    for (const p of products) {
+      for (const f of Object.keys(c) as Filter[]) if (matchesFilter(p, f)) c[f]++
+    }
+    return c
+  }, [products])
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return products.filter(
+      (p) =>
+        matchesFilter(p, filter) &&
+        (!q || [p.name, p.barcode, p.custom_code].some((v) => v?.toLowerCase().includes(q)))
+    )
+  }, [products, filter, query])
 
   const addProduct = async () => {
-    if (!name.trim()) return
+    if (!name.trim()) return setError('Enter a product name.')
+    setSaving(true)
     const { error } = await supabase.from('products').insert({
       name: name.trim(),
       barcode: barcode.trim() || null,
+      custom_code: customCode.trim() || null,
+      supplier_id: supplierId || null,
       reorder_quantity: Number(reorderQty) || 0,
     })
-    if (error) return alert(error.message)
+    setSaving(false)
+    if (error) return setError(friendlyProductError(error))
+    setError(null)
     setName('')
     setBarcode('')
+    setCustomCode('')
     setReorderQty('0')
-    load()
-  }
-
-  const saveEdit = async () => {
-    if (!editing) return
-    const { error } = await supabase
-      .from('products')
-      .update({
-        name: editing.name,
-        barcode: editing.barcode,
-        reorder_quantity: editing.reorder_quantity,
-      })
-      .eq('id', editing.id)
-    if (error) return alert(error.message)
-    setEditing(null)
-    load()
-  }
-
-  const discontinue = async () => {
-    if (!editing) return
-    const { error } = await supabase
-      .from('products')
-      .update({ status: 'discontinued' })
-      .eq('id', editing.id)
-    if (error) return alert(error.message)
-    setEditing(null)
+    setAdding(false)
     load()
   }
 
@@ -92,67 +116,138 @@ export default function ProductsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-xl font-semibold tracking-tight text-slate-900">Products</h2>
-
-      <div className={cardClass}>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Product name" className={inputClass} />
-        <div className="flex gap-2">
-          <input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Barcode (optional)" className={`flex-1 ${inputClass}`} />
-          <button type="button" onClick={() => setScanningFor('add')} className={secondaryButtonClass}>Scan</button>
-        </div>
-        <input type="number" value={reorderQty} onChange={(e) => setReorderQty(e.target.value)} placeholder="Reorder quantity" className={inputClass} />
-        <button onClick={addProduct} className={primaryButtonClass}>Add product</button>
+      <div className="flex items-center justify-between">
+        <h2 className={pageTitleClass}>Products</h2>
+        {!adding && (
+          <button onClick={() => setAdding(true)} className={`${primaryButtonClass} px-3`}>
+            + New product
+          </button>
+        )}
       </div>
 
-      <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        {products.map((p) => (
-          <li key={p.id} onClick={() => setEditing(p)} className="flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-slate-50">
-            <div>
-              <p className="font-medium text-slate-900">{p.name}</p>
-              <p className="text-xs text-slate-500">{p.barcode || p.custom_code} · {p.supplier_name ?? 'no supplier'}</p>
-            </div>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{p.total_stock} on hand</span>
-          </li>
-        ))}
-      </ul>
+      {error && <p className={errorClass}>{error}</p>}
 
-      {editing && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-          <div className="flex w-full max-w-xs flex-col gap-2 rounded-xl bg-white p-5 shadow-xl">
-            <p className="text-sm font-semibold text-slate-900">Edit product</p>
-            <input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className={inputClass} />
-            <div className="flex gap-2">
-              <input value={editing.barcode ?? ''} onChange={(e) => setEditing({ ...editing, barcode: e.target.value })} className={`flex-1 ${inputClass}`} />
-              <button type="button" onClick={() => setScanningFor('edit')} className={secondaryButtonClass}>Scan</button>
-            </div>
-            <input type="number" value={editing.reorder_quantity} onChange={(e) => setEditing({ ...editing, reorder_quantity: Number(e.target.value) })} className={inputClass} />
-            <button onClick={saveEdit} className={primaryButtonClass}>Save</button>
-            <button onClick={discontinue} className={dangerButtonClass}>Mark discontinued</button>
-            <button onClick={() => setEditing(null)} className={`self-center ${ghostButtonClass}`}>Cancel</button>
+      {adding && (
+        <div className={cardClass}>
+          <p className="text-sm font-semibold text-slate-900">New product</p>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Product name" className={inputClass} />
+          <div className="flex gap-2">
+            <input
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              placeholder="Barcode (optional)"
+              className={`min-w-0 flex-1 ${inputClass}`}
+            />
+            <button type="button" onClick={() => setScanning(true)} className={secondaryButtonClass}>
+              Scan
+            </button>
           </div>
+          <input
+            value={customCode}
+            onChange={(e) => setCustomCode(e.target.value)}
+            placeholder="Custom code (optional, for items without a barcode)"
+            className={inputClass}
+          />
+          <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={inputClass}>
+            <option value="">No supplier</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <label className={labelClass}>
+            Reorder quantity
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={reorderQty}
+              onChange={(e) => setReorderQty(e.target.value)}
+              className={`mt-1 w-full ${inputClass}`}
+            />
+          </label>
+          <button onClick={addProduct} disabled={saving} className={primaryButtonClass}>
+            {saving ? 'Saving...' : 'Add product'}
+          </button>
+          <button onClick={() => setAdding(false)} className={`${secondaryButtonClass} py-2`}>
+            Cancel
+          </button>
         </div>
       )}
-      {scanningFor && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-          <div className="flex w-full max-w-xs flex-col gap-3 rounded-xl bg-white p-5 shadow-xl">
-            <p className="text-sm font-semibold text-slate-900">Scan barcode</p>
-            <BarcodeScanner
-              onScan={(code) => {
-                if (scanningFor === 'add') {
-                  setBarcode(code)
-                } else if (scanningFor === 'edit' && editing) {
-                  setEditing({ ...editing, barcode: code })
-                }
-                setScanningFor(null)
-              }}
-              onError={(msg) => {
-                alert(msg)
-                setScanningFor(null)
-              }}
-            />
-            <button onClick={() => setScanningFor(null)} className={`self-center ${ghostButtonClass}`}>Cancel</button>
-          </div>
+
+      <div className="flex flex-col gap-3">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Filter by name, barcode, or code"
+          className={inputClass}
+        />
+        <div className="flex gap-2 overflow-x-auto [scrollbar-width:none]">
+          {(Object.keys(filterLabels) as Filter[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                filter === f
+                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {filterLabels[f]} <span className={filter === f ? 'text-indigo-200' : 'text-slate-400'}>{counts[f]}</span>
+            </button>
+          ))}
         </div>
+      </div>
+
+      {visible.length === 0 ? (
+        <p className="text-center text-sm text-slate-500">
+          {products.length === 0 ? 'No products yet — add your first one above.' : 'No products match.'}
+        </p>
+      ) : (
+        <ul className={listClass}>
+          {visible.map((p) => {
+            const status = stockStatus(p)
+            return (
+              <li key={p.id}>
+                <Link
+                  to={`/products/${p.id}`}
+                  className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-slate-50"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-slate-900">{p.name}</p>
+                    <p className="truncate text-xs text-slate-500">
+                      {productCode(p)} · {p.supplier_name ?? 'no supplier'}
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+                      p.status === 'discontinued' ? stockBadgeClass.ok : stockBadgeClass[status]
+                    }`}
+                  >
+                    {p.total_stock} on hand
+                  </span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      {scanning && (
+        <Modal title="Scan barcode" onClose={() => setScanning(false)}>
+          <BarcodeScanner
+            onScan={(code) => {
+              setBarcode(code)
+              setScanning(false)
+            }}
+            onError={(msg) => {
+              setError(msg)
+              setScanning(false)
+            }}
+          />
+        </Modal>
       )}
     </div>
   )
